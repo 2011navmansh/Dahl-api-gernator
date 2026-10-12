@@ -1,0 +1,13 @@
+{
+  "name": "api-extractor",
+  "version": "1.0.0",
+  "description": "Dahl (inference.dahl.global) account + API key extractor — educational",
+  "private": true,
+  "main": "extractor.js",
+  "scripts": {
+    "start": "node extractor.js"
+  },
+  "dependencies": {
+    "puppeteer": "^24.10.0"
+  }
+}

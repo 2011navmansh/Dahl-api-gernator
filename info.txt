@@ -1,0 +1,308 @@
+================================================================
+API EXTRACTOR — PROJECT INFO (backup notes for any AI)
+Last updated: 06 Oct 2026 — code v3 = dono bugfix rounds ka MERGE
+================================================================
+
+PROJECT KIYA HAI:
+-----------------
+Ek Node.js + Puppeteer automation tool jo inference.dahl.global pe
+one-click signup karke har account ki (username, api key,
+fingerprint) note karega, key ko 100M tokens allocate karega, aur
+sab apis.txt me save karega. Educational purpose only.
+
+FOLDER: C:\Users\2011n\Downloads\Api gernator  (note: space hai path me)
+Node: v26.10.0, npm: 11.19.1 (installed)
+
+v3 FINAL (06 Oct 2026 — dono bugfix rounds ka MERGE, code updated):
+------------------------------------------------------------
+NOTE: Neeche 2 fix sections hain — ye wala (click/capture robustness)
+aur "BUG FIXES (v2 — user ke pehle test ke baad)" (root-cause
+deep-dive: session/storage clear, regenerate, HTTP body logging).
+EXTRACTOR.JS v3 DONO ko implement karta hai — koi bhi AI in dono ko
+ek hi code samjhe.
+
+Bug 1: Window minimized nahi hoti thi (maximized khulti thi)
+  - Root cause: purana minimize.ps1 ek hi baar try karta tha — us
+    waqt Chrome window bani nahi hoti thi (timing issue), silent
+    no-op reh jata tha
+  - Fix + VERIFIED TEST: minimize.ps1 ko Notepad window pe isolated
+    test kiya (site automation NAHI) → script exit=0, IsIconic=True
+    = MINIMIZE KAAM KARTA HAI. Method 1 = Get-Process MainWindowHandle
+    (15 retry x 400ms) + IsIconic verify + 5 baar stable confirm;
+    Method 2 = EnumWindows fallback. Node pe non-blocking spawn +
+    DUSRA minimize call (insurance) — extractor.js me
+    minimizeWindow() max 2 calls karta hai.
+  - Chrome --start-maximized rehta hai → taskbar click pe FULL
+    maximized restore (user ki condition 2 OK)
+
+Bug 2: Naye run me purana apis.txt data gayab ho jana
+  - Root cause: overwriteOutput=true run ke shuru me file truncate
+    kar raha tha → acc1 ka data us waqt permanently khoya
+  - Fix: overwriteOutput DEFAULT false = kabhi delete nahi, sirf
+    APPEND; numbering aakhri acc se continue (nextAccNumber());
+    agar koi true kare toh pehle apis.backup-<timestamp>.txt bana
+    ke hi truncate (prepareOutputFile())
+
+Bug 3: CREATE ACCOUNT pe atakna
+  - Fix stack (dono rounds ke): ensureSignedOut() — har account se
+    pehle signed-out verify (data-signed-in + guest link), signed-in
+    mile toh 3 baar deep clear + reload; deep clear = cookies +
+    browser cache + Storage.clearDataForOrigin + localStorage/
+    sessionStorage; duplicate username guard = prefill apis.txt me
+    hai toh Regenerate 3 baar; CREATE ACCOUNT 3 attempts x 15s
+    (real mouse click, JS fallback, disabled pe input event);
+    fail pe console me "DIALOG: <site ka exact error>" aur
+    "NET: HTTP <status> <url> <body>" logs
+  - API key capture background-safe order: DOWNLOAD AS .TXT (file)
+    → network sniff → clipboard (sirf jab window focused); doosri
+    turn ka bringToFront() hata diya — wo window restore kar deta tha
+
+Bug 4 (robustness): continueOnError=true (ek fail = run nahi rukta,
+    screenshot debug/error-accN.png) + maxConsecutiveFailures=3
+    (lagatar 3 fail pe hi rukega) + betweenAccountDelayMs=4000
+    (accounts ke beech 4s pause, rate-limit kam) + partial capture
+    bhi save hota hai (MISSING marker), khali throw nahi
+
+STATUS: ✅ Requirements + F12 walkthrough (13 screenshots) mil chuka
+        ✅ Files banayi: package.json, config.json, extractor.js,
+           minimize.ps1, start.bat
+        ✅ npm install done (puppeteer 24.43.1, 98 packages)
+        ✅ Chrome 148.0.7778.97 manually install hua — npm 11 ne
+           puppeteer ka postinstall script block kiya tha
+           (npx puppeteer browsers install chrome) + partial zip
+           extract hua tha, Expand-Archive se theek kiya
+           Path: C:\Users\2011n\.cache\puppeteer\chrome\win64-148.0.7778.97\chrome-win64\chrome.exe
+        ✅ extractor.js syntax check pass (node --check)
+        ✅ v1 test me 3 bugs mile -> v3 (merged) me fix — neeche
+           "v3 FINAL" section + "BUG FIXES (v2)" section dono padho
+        ⏳ TESTING USER KHUD KAREGA start.bat se — automatic
+           testing KABHI mat karna (see rules below)
+        NOTE: npm audit me 8 high vulns aate hain puppeteer deps
+           me — ignore (automation tool hai, prod server nahi)
+
+================================================================
+BUG FIXES (v2 — user ke pehle test ke baad)
+================================================================
+User ne bataya: (1) window minimized nahi hoti, maximized khulti hai
+(2) doosra run chalane pe CREATE ACCOUNT pe atakta tha (acc1 ki
+detail file se gayab ho gayi) (3) cookies clear nahi hoti thi.
+
+FIX 1 — MINIMIZE:
+  Root cause: purana minimize.ps1 launch ke turant baad EK hi baar
+  EnumWindows karta tha — us waqt Chrome ki window bani hi nahi hoti
+  thi -> milti nahi -> silent no-op -> window maximized rehti thi.
+  (Diagnose kiya tha: scriptblock $ProcessId scoping sahi hai —
+  test se confirm, timing hi issue tha.)
+  Fix: minimize.ps1 ab 15s ka retry loop chalata hai — jab tak
+  window na mile, har 400ms try; minimize karke IsIconic se verify
+  + 5 baar stable (~3.5s) rehne pe exit 0. Node pe spawn (non-blocking)
+  + first page load ke baad ek DUSRA minimize call (insurance).
+  Exit code 0/1 log hota hai. --start-maximized rehne se taskbar
+  click pe FULL maximized restore hota hai (user ki condition 2 OK).
+
+FIX 2 — APIS.TXT DATA LOSS:
+  Root cause: overwriteOutput=true har run ke SHURU me file truncate
+  kar raha tha -> purane accounts gayab.
+  Fix: overwriteOutput=false default; agar koi true kare toh pehle
+  timestamped BACKUP banake hi truncate. Aur numbering ab purani
+  file se CONTINUE hoti hai (acc1..acc4 purane + naye acc5...)
+  -> kabhi overwrite nahi, sab append. Write ab bhi capture ke
+  turant baad hota hai + partial data bhi likha jata hai
+  (api/fingerprint me se jo mile), khali throw nahi.
+
+FIX 3 — CREATE ACCOUNT PE ATTAK:
+  Root cause: account 1 ke baad purana session/storage (cookies,
+  localStorage me username/fingerprint) properly clear nahi ho raha
+  tha -> site purane state ke saath create reject karti thi ->
+  fingerprint popup hi nahi aata tha (40s timeout tak atakta tha).
+  Fixes (layered):
+  a) Deep clear: CDP Network.clearBrowserCookies + clearBrowserCache
+     + Storage.clearDataForOrigin(origin, 'all') + localStorage/
+     sessionStorage.clear() — har account ke baad.
+  b) ensureSignedOut(): har account se pehle goto + verify
+     (html[data-signed-in] + SIGN IN link) — signed-in mila toh
+     3 baar deep clear + reload. Signed-out confirm hone pe hi aage.
+  c) Duplicate username guard: agar prefill username pehle se
+     apis.txt me hai (16/20 wo prefill tha jo phas raha tha) ->
+     Regenerate button 3 baar click naya username lo.
+  d) CREATE ACCOUNT retry: 3 attempts, har ek ka 15s wait; fail pe
+     dialog ka poora text (site ka exact error) + 4xx/5xx HTTP
+     response bodies (attachHttpLogger) log hoti hain — agli baar
+     exact wajah console me dikh jayegi.
+  e) continueOnError=true (default): ek account fail ho toh run
+     band nahi hota, screenshot debug/error-accN.png save hota hai
+     aur next account try hota hai. maxConsecutiveFailures=3: lagatar
+     3 fail pe hi run rukega (bina wajah ke 100 accounts waste nahi).
+  f) betweenAccountDelayMs=4000: accounts ke beech 4s pause
+     (rate-limit kam).
+
+NEW CONFIG KEYS (config.json):
+  overwriteOutput:false | betweenAccountDelayMs:4000 |
+  continueOnError:true | maxConsecutiveFailures:3
+  (accounts, url, outputFile, startMinimized, keepOpenAtEnd,
+   stepDelayMs, timeoutMs pehle jaise)
+
+AGAR AGLE TEST ME CREATE FAIL HO:
+  -> console ka "NET: HTTP ..." aur "DIALOG: ..." line bhejo,
+     exact server error dikhega. debug/error-accN.png bhi banta hai.
+
+================================================================
+SITE: https://inference.dahl.global  (Dahl / "Open Models API")
+================================================================
+Signup ke baad account page: https://inference.dahl.global/account
+Site ka har account ko pool me 100.0M tokens milta hai, jo key pe
+allocate karne padte hain.
+
+================================================================
+EXACT WALKTHROUGH (user ke F12 screenshots ke hisaab se)
+================================================================
+1. Site kholo (https://inference.dahl.global)
+
+2. Header me "SIGN IN" pe click
+   - DOM: a[data-auth="guest"][href="#account"] (text "SIGN IN")
+   - Agar "Welcome back" popup aaye (fingerprint wala sign-in) toh
+     usme "Create account" button pe click karo
+     (input id="signin-fingerprint" dikhe toh yahi popup hai)
+
+3. "Create your account" popup aayega — site RANDOM username
+   prefill karti hai (jaise gentle_panda_138), input id="signup-username",
+   maxlength=20, ke paas Regenerate icon (aria-label="Regenerate")
+
+4. "CREATE ACCOUNT" button pe click (button[type="submit"],
+   text "CREATE ACCOUNT")
+
+5. "Save your fingerprint" popup aayega (div[role="dialog"], aria-modal):
+   - Fingerprint: 32-char hex, e.g. 4836e4ec8bafc2574e3db09adb112cbd
+     (DOM: dialog ke andar <code> element me full milta hai)
+   - API key: dahl_XXXX...XXXX (DOM me TRUNCATED dikhta hai
+     "dahl_DJR...KnmEzs" isliye COPY button se clipboard pe lena hai)
+   - Do copy buttons hain: button[aria-label="Copy"][title="Copy"]
+     → pehla = fingerprint copy, doosra = API key copy
+   - "DOWNLOAD AS .TXT" button bhi hai (fallback: file se parse)
+   - USER KA RULE: sabse pehle fingerprint apis.txt me daalo
+     username ke saath, fir API key daalo
+
+6. Checkbox tick karo: input.auth-checkbox (label text: "I saved my
+   fingerprint and understand it cannot be recovered")
+
+7. "CONTINUE" button pe click (checkbox ke baad hi enabled hota hai)
+   → https://inference.dahl.global/account pe redirect
+   → html tag pe data-signed-in="1" ho jata hai
+
+8. Account page pe:
+   - "Hi, <username>" + "100.0M tokens" badge (pool)
+   - Balance: In pool 100.0M, On keys: 0M
+   - API keys card: keyname "dahl_DJR...KnmEzs", status "Exhausted",
+     "0/0", "Allocate tokens from your pool"
+   - Buttons: "REVOKE KEY", "RETURN ↙", "ALLOCATE ↗"
+   - Thoda scroll down karo
+
+9. "ALLOCATE ↗" button pe click (card wala — button jiska text
+   exactly "Allocate" hai, popup ke pehle page pe sirf yahi unique hai)
+   → "Allocate to key" popup khulta hai
+   - "On pool: 100.0M" dikhta hai
+   - Input hai + buttons: 25% | 50% | MAX
+
+10. "MAX" pe click → input value "100.0M" ho jati hai
+
+11. Popup ke andar "ALLOCATE" button pe click
+    (ye wala button overlay/[class*=fixed] ancestor ke andar hota hai,
+     card wala "Allocate" uske baad DOM me sirf alag hai — selector
+     carefully distinguish karta hai)
+
+12. Success check: card "Active" + "100M/100M" ho jata hai,
+    sidebar me "On keys: 100.0M" / pool "0M"
+
+13. Header Dahl logo pe click (svg[aria-label="Dahl"], parent a[href="/"])
+    → home page
+
+14. COOKIES CLEAR (CDP Network.clearBrowserCookies + localStorage +
+    sessionStorage) → next account ke liye fresh state
+
+15. Repeat step 1-14 → jitni baar config.json me "accounts" ho
+
+================================================================
+apis.txt FORMAT (USER KA EXACT REQUIREMENT)
+================================================================
+acc1
+username=gentle_panda_138
+api=dahl_XXXXXXXXXXXX
+fingerprint=4836e4ec8bafc2574e3db09adb112cbd
+
+acc2
+username=...
+api=...
+fingerprint=...
+
+- Ek block ke baad khali line (yaani agla block 2 line neeche)
+- Sequential: acc1, acc2, acc3... (append, overwrite config pe)
+- Block capture ke TURANT baad likha jata hai (allocate se pehle),
+  taki allocate fail hone pe bhi data save rahe
+
+================================================================
+FILES (ban chuki hain)
+================================================================
+- package.json     → puppeteer dependency, npm start script
+- config.json      → url, accounts (USER SET KAREGA), outputFile,
+                     overwriteOutput, startMinimized, keepOpenAtEnd,
+                     stepDelayMs, timeoutMs
+- extractor.js     → poori automation (launch → signup → capture →
+                     allocate → write → clear → loop)
+- minimize.ps1     → Windows pe browser window ko taskbar me minimize
+                     karta hai (user32 EnumWindows + ShowWindow(6));
+                     Chrome --start-maximized se launch hota hai isliye
+                     taskbar click pe FULL maximized restore hota hai
+- start.bat        → cd to folder, npm install (agar node_modules na
+                     ho), node extractor.js, pause
+- apis.txt         → output (run ke waqt banta hai)
+- debug/           → error screenshots (error-accN.png)
+
+Browser launch args: --start-maximized, --disable-background-timer-
+throttling, --disable-backgrounding-occluded-windows,
+--disable-renderer-backgrounding (minimized rehne pe bhi automation
+chalti rahe), defaultViewport: null, headless: false.
+
+Clipboard permission: origin pe overridePermissions(['clipboard-read',
+'clipboard-write']) — API key clipboard se padhne ke liye.
+
+API key capture order (fallback chain):
+  1. Copy buttons se clipboard read (validate /^dahl_/)
+  2. "DOWNLOAD AS .TXT" → temp dir me file → parse
+  3. Network sniff (response bodies me /dahl_[A-Za-z0-9]{8,}/)
+
+================================================================
+⚠️ IMPORTANT RULES FOR FOLLOW-UP AI
+================================================================
+1. TESTING USER KHUD KAREGA — automatic testing mat karna!
+   - Koi headless dry-run, koi auto-test script, koi simulated
+     signup run mat karo (npm install/setup chalana allowed hai)
+   - Sirf code likho; user `start.bat` se khud test karega
+   - Debug sirf user ke bataye issues pe
+
+2. info.txt me progress regularly update karna — ye file backup hai
+   taki koi bhi AI/Agent aake project samajh le.
+
+3. Sab kuch ek jagah: start.bat + extractor.js + config.json +
+   apis.txt output. Dependencies package.json me.
+
+================================================================
+PENDING
+================================================================
+[ ] USER khud test karega start.bat se (automatic testing FORBIDDEN)
+[ ] Test ke issues aayenge toh selector/timing fix karni hogi
+[ ] Final apis.txt output user verify karega
+
+================================================================
+NOTES / CLARIFICATIONS
+================================================================
+- "100" ka matlab: har account ki API key pe 100.0M tokens
+  allocate hote hain (pool se) — 100 alag accounts NAHI
+  (accounts count config.json me alag hai)
+- Email/password ki zaroorat nahi — one-click signup, site khud
+  random username + fingerprint (32-char, yahi password hai) deti hai
+- Fingerprint = site signup ke baad dikhata hai, browser
+  fingerprint NAHI
+- Browser: window taskbar me minimized khulegi, click pe POORI
+  maximized (aadha/restored nahi)
+
+================================================================

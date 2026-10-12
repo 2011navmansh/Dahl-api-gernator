@@ -1,0 +1,13 @@
+{
+  "url": "https://inference.dahl.global",
+  "accounts": 100,
+  "outputFile": "apis.txt",
+  "overwriteOutput": false,
+  "startMinimized": false,
+  "keepOpenAtEnd": false,
+  "continueOnError": true,
+  "maxConsecutiveFailures": 3,
+  "stepDelayMs": 1200,
+  "betweenAccountDelayMs": 2000,
+  "timeoutMs": 1000
+}
